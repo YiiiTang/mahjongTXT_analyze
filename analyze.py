@@ -1,7 +1,8 @@
-from mjanalyzer_web import parse_tiles, _validate_counts
+from mjanalyzer_web import parse_tiles, _validate_counts, run_automation
 import re
 
 FILENAME = "SimCat VS Dartrix VS MeowCaTS VS Rowlet (2025_05_03_17_29_56_3208)-(Rowlet(Win))_Win.txt"
+URL_DEFAULT = "https://mjanalyzer.netlify.app/"
 
 Player = [[] for _ in range(4)]
 abandonList = []
@@ -68,6 +69,15 @@ def strCard(cards):
         out +=  str(str(int(card/10%10)) + typeDict[int(card/100)] + '(' + str(card%10) +') ')
     return out
 
+def parse_list(cards):
+    typeDict = {0:'', 1:'m', 2:'p', 3:'s', 4:'z'}
+    out = ""
+    for card in cards:
+            card = int(card)
+            out +=  str(str(int(card/10%10)) + typeDict[int(card/100)])
+    return out
+        
+
 if __name__ == "__main__":
     processFile()
     PlayerBank = Step[0][1]
@@ -82,3 +92,17 @@ if __name__ == "__main__":
         print("南:" + strCard(sorted(Player[getPlayerFromLoc('S')])) + '\n')
         print("西:" + strCard(sorted(Player[getPlayerFromLoc('W')])) + '\n')
         print("池:" + strCard(abandonList))
+
+    hand = parse_tiles(parse_list(Player[getPlayerFromLoc('N')]))
+    dead = parse_tiles(parse_list(abandonList))
+    _validate_counts(hand, dead) #Check if tiles are correct
+    run_automation(
+            hand=hand,
+            dead=dead,
+            url=URL_DEFAULT,
+            headless=False,
+            slow_mo=150,
+            timeout_ms=0,
+            screenshot='',
+            pause=True,
+        )
