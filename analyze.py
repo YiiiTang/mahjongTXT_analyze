@@ -106,9 +106,10 @@ if __name__ == "__main__":
     processFile()
     PlayerBank = Step[0][1]
     Winner = processAction(Step[len(Step) - 1])
-    inputIndex = int(input('輸入模擬的步驟:(-1=last)'))
-    if inputIndex == -1:
-        inputIndex = len(Step) - 2
+    inputIndex = input('輸入模擬的步驟:(Enter=last)')
+    if inputIndex == '':
+        inputIndex = len(Step)
+    else: inputIndex = int(inputIndex)
     if(inputIndex > len(Step)):
         print("超出模擬步驟範圍")
         exit()
@@ -121,15 +122,22 @@ if __name__ == "__main__":
         print("西:" + strCard(sorted(Player[getPlayerFromLoc('W')])))
         print("池:" + strCard(abandonList))
 
-    hand = parse_tiles(parse_list(Player[getPlayerFromLoc(Winner)]))
+    hand = [parse_tiles(parse_list(Player[getPlayerFromLoc(Winner)]))]
+    hand.append(parse_tiles(parse_list(Player[getPlayerFromLoc('E')])))
+    hand.append(parse_tiles(parse_list(Player[getPlayerFromLoc('S')])))
+    hand.append(parse_tiles(parse_list(Player[getPlayerFromLoc('W')])))
+    hand.append(parse_tiles(parse_list(Player[getPlayerFromLoc('N')])))
     dead = parse_tiles(parse_list(abandonList))
-    _validate_counts(hand, dead) #Check if tiles are correct
+    _validate_counts(hand[1], dead) #Check if tiles are correct
+    _validate_counts(hand[2], dead) #Check if tiles are correct
+    _validate_counts(hand[3], dead) #Check if tiles are correct
+    _validate_counts(hand[4], dead) #Check if tiles are correct
     run_automation(
             hand=hand,
             dead=dead,
             url=URL_DEFAULT,
             headless=False,
-            slow_mo=150,
+            slow_mo=10,
             timeout_ms=0,
             screenshot='',
             pause=True,
