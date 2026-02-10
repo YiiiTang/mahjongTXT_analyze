@@ -37,8 +37,8 @@ def processAction(Step):
             pass
         if(actionStr == 'UG'):#吃 捨對手排，進自己牌池(連續)
             pass
-        if(actionStr == 'H'):#???
-            pass
+        if(actionStr == 'H'):#Winner?
+            return Step[1]
     except:
         print('err')
         pass
@@ -92,6 +92,7 @@ def parse_list(cards):
 if __name__ == "__main__":
     processFile()
     PlayerBank = Step[0][1]
+    Winner = processAction(Step[len(Step) - 1])
     inputIndex = int(input('輸入模擬的步驟:'))
     if(inputIndex > len(Step)):
         print("超出模擬步驟範圍")
@@ -104,7 +105,7 @@ if __name__ == "__main__":
         print("西:" + strCard(sorted(Player[getPlayerFromLoc('W')])) + '\n')
         print("池:" + strCard(abandonList))
 
-    hand = parse_tiles(parse_list(Player[getPlayerFromLoc('N')]))
+    hand = parse_tiles(parse_list(Player[getPlayerFromLoc(Winner)]))
     dead = parse_tiles(parse_list(abandonList))
     _validate_counts(hand, dead) #Check if tiles are correct
     run_automation(
