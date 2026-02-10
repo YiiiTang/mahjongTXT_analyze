@@ -47,14 +47,21 @@ def processAction(Step):
 Step = []
 def processFile():
     #Fix the format for 2025+ txt
-    with open(FILENAME, "r", encoding='utf-16-le') as f:
-        lines = ""
-        if not f.readline().startswith('* '):
-            lines = f.readlines()
-            lines = lines[0:]
-    if lines != "":
-        with open(FILENAME, "w", encoding='utf-16-le') as f:
-            f.writelines(lines)
+    ##FIXME: Python好像刪不乾淨
+    # modified = False
+    # with open(FILENAME, "r", encoding='utf-16-le') as f:
+    #     line1 = f.readline()
+    #     rest_lines = f.readlines()[0:]
+    #     if not line1.startswith('* '):
+    #         pos = line1.find("*")
+    #         if pos != -1:
+    #             modified = True
+    #             line1 = "* \n"#FIXME: Python其他寫法好像刪不乾淨
+
+    # if modified:
+    #     with open(FILENAME, "w", encoding='utf-16-le') as f:
+    #         f.write(line1)
+    #         f.writelines(rest_lines)
 
     
     with open(FILENAME, "r", encoding='utf-16-le') as f:
