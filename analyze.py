@@ -24,8 +24,9 @@ def processAction(Step):
         if(actionStr == 'HD'):#打牌，捨手排 去牌池
             Player[getPlayerFromLoc(Step[1])].remove(Step[3])
             abandonList.append(Step[3])
-        if(actionStr == 'MD'):#摸切
-            pass
+        if(actionStr == 'MD'):#摸切 不加入手排 去牌池
+            Player[getPlayerFromLoc(Step[1])].remove(Step[3])
+            abandonList.append(Step[3])
         if(actionStr == 'P'):#碰 捨對手排，進自己牌池(三排相同)
             abandonList.remove(Step[3])
             Player[getPlayerFromLoc(Step[1])].append(Step[3])
@@ -105,16 +106,19 @@ if __name__ == "__main__":
     processFile()
     PlayerBank = Step[0][1]
     Winner = processAction(Step[len(Step) - 1])
-    inputIndex = int(input('輸入模擬的步驟:'))
+    inputIndex = int(input('輸入模擬的步驟:(-1=last)'))
+    if inputIndex == -1:
+        inputIndex = len(Step) - 2
     if(inputIndex > len(Step)):
         print("超出模擬步驟範圍")
         exit()
     for i in range(inputIndex):
         processAction(Step[i])
-        print("北:" + strCard(sorted(Player[getPlayerFromLoc('N')])) + '\n')
-        print("東:" + strCard(sorted(Player[getPlayerFromLoc('E')])) + '\n')
-        print("南:" + strCard(sorted(Player[getPlayerFromLoc('S')])) + '\n')
-        print("西:" + strCard(sorted(Player[getPlayerFromLoc('W')])) + '\n')
+        print("\n第" + str(i+1) + "步:")
+        print("北:" + strCard(sorted(Player[getPlayerFromLoc('N')])))
+        print("東:" + strCard(sorted(Player[getPlayerFromLoc('E')])))
+        print("南:" + strCard(sorted(Player[getPlayerFromLoc('S')])))
+        print("西:" + strCard(sorted(Player[getPlayerFromLoc('W')])))
         print("池:" + strCard(abandonList))
 
     hand = parse_tiles(parse_list(Player[getPlayerFromLoc(Winner)]))
