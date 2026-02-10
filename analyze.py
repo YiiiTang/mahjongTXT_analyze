@@ -63,14 +63,19 @@ def processFile():
                 Step.append(line.replace(".", "").replace("* ", "").strip().split(' ')) #Step list
             if("SQRWALL" in line):
                 river = line.replace("* SQRWALL ", "").split(' ')#River wall list
-                k = 0
-                for i in range(0, 64, 4):
-                    for j in range(4):
-                        Player[k].append(river[i+j])
-                    if(k == 3):
-                        k = 0
-                    else:
-                        k += 1
+                for i in range(0, 65):
+                    if i < 17:
+                        Player[0].append(river[i])
+                        continue
+                    if i < 33:
+                        Player[1].append(river[i])
+                        continue
+                    if i < 49:
+                        Player[2].append(river[i])
+                        continue
+                    if i < 65:
+                        Player[3].append(river[i])
+                        continue
 
 def strCard(cards):
     typeDict = {0:'花', 1:'萬', 2:'筒', 3:'條', 4:'字'}
