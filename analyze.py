@@ -1,7 +1,7 @@
 from mjanalyzer_web import parse_tiles, _validate_counts, run_automation
 import re
 
-FILENAME = "SimCat VS Dartrix VS MeowCaTS VS Rowlet (2025_05_03_17_29_56_3208)-(Rowlet(Win))_Win.txt"
+FILENAME = "SimCat VS MeowCaTS VS Rowlet VS Dartrix (2025_05_03_23_34_33_8270)-(MeowCaTS(Win))_Win.txt"
 URL_DEFAULT = "https://mjanalyzer.netlify.app/"
 
 Player = [[] for _ in range(4)]
@@ -46,6 +46,17 @@ def processAction(Step):
 
 Step = []
 def processFile():
+    #Fix the format for 2025+ txt
+    with open(FILENAME, "r", encoding='utf-16-le') as f:
+        lines = ""
+        if not f.readline().startswith('* '):
+            lines = f.readlines()
+            lines = lines[0:]
+    if lines != "":
+        with open(FILENAME, "w", encoding='utf-16-le') as f:
+            f.writelines(lines)
+
+    
     with open(FILENAME, "r", encoding='utf-16-le') as f:
         for line in f:
             if re.match(r'\*\s*\d+\.', line):
