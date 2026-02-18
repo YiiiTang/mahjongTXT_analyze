@@ -150,6 +150,10 @@ def readNavAction():
         return 'jump_step'
     return 'next_view'
 
+def strCard(card: int):
+    typeDict = {0:'花', 1:'萬', 2:'筒', 3:'條', 4:'字'}
+    out =  str(str(int(card/10%10)) + typeDict[int(card/100)])
+    return out
 
 def automationCtrl(stepIndex: int):
     currentStep = max(0, min(stepIndex, len(Step)))
@@ -162,11 +166,11 @@ def automationCtrl(stepIndex: int):
             return
 
         loc = {0: f'贏家({winner})', 1: '東', 2: '南', 3: '西', 4: '北'}
-
+        action = {'M':'摸', 'HD':"打", 'MD': "摸後直接打", 'P': "碰", 'E': "吃", 'H': '為贏家'}
         print("\n" + "=" * 40)
         print(f"Step: {currentStep}/{len(Step)}")
         if currentStep > 0:
-            print(f"Action: {' '.join(Step[currentStep - 1][1:])}")
+            print(f"Action: {' '.join(Step[currentStep - 1][1:])} ({loc[getPlayerFromLoc(Step[currentStep - 1][1])]} {action[Step[currentStep - 1][2]]} {strCard(int(Step[currentStep - 1][3]))})")
         print("Controls: ←/→ step, ↑/↓ view, Enter next view, G jump, Q quit")
         for i in range(5):
             marker = '>' if i == currentView else ' '
