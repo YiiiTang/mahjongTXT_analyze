@@ -101,11 +101,51 @@ def parse_list(cards):
             out +=  str(str(int(card/10%10)) + typeDict[int(card/100)])
     return out
         
+def automationCtrl(stepIndex: int):
+    
+    Winner = processAction(Step[len(Step) - 1])
+    for i in range(stepIndex):
+        processAction(Step[i])
+        # print("\n第" + str(i+1) + "步:")
+        # print("北:" + strCard(sorted(Player[getPlayerFromLoc('N')])))
+        # print("東:" + strCard(sorted(Player[getPlayerFromLoc('E')])))
+        # print("南:" + strCard(sorted(Player[getPlayerFromLoc('S')])))
+        # print("西:" + strCard(sorted(Player[getPlayerFromLoc('W')])))
+        # print("池:" + strCard(abandonList))
+    hand = [parse_tiles(parse_list(Player[getPlayerFromLoc(Winner)]))]
+    hand.append(parse_tiles(parse_list(Player[getPlayerFromLoc('E')])))
+    hand.append(parse_tiles(parse_list(Player[getPlayerFromLoc('S')])))
+    hand.append(parse_tiles(parse_list(Player[getPlayerFromLoc('W')])))
+    hand.append(parse_tiles(parse_list(Player[getPlayerFromLoc('N')])))
+    dead = parse_tiles(parse_list(abandonList))#池
+    for i in range(1, 5):
+        _validate_counts(hand[i], dead) #Check if tiles are correct
+
+    i = 0
+    while 1:
+        loc = {0: '贏家', 1:'東', 2:'南', 3:'西', 4:'北'}
+        print(loc[i])
+        run_automation(
+                hand=hand[i],
+                dead=dead,
+                url=URL_DEFAULT,
+                headless=False,
+                slow_mo=10,
+                timeout_ms=0,
+                screenshot='',
+                pause=False,
+            )
+        action = input("Enter 以分析下一組，或直接按數字")
+        if action == '':
+            i+=1
+        else:
+            i = int(action)
+        if i == 5: i = 0
+    pass
 
 if __name__ == "__main__":
     processFile()
     PlayerBank = Step[0][1]
-    Winner = processAction(Step[len(Step) - 1])
     inputIndex = input('輸入模擬的步驟:(Enter=last)')
     if inputIndex == '':
         inputIndex = len(Step)
@@ -113,32 +153,5 @@ if __name__ == "__main__":
     if(inputIndex > len(Step)):
         print("超出模擬步驟範圍")
         exit()
-    for i in range(inputIndex):
-        processAction(Step[i])
-        print("\n第" + str(i+1) + "步:")
-        print("北:" + strCard(sorted(Player[getPlayerFromLoc('N')])))
-        print("東:" + strCard(sorted(Player[getPlayerFromLoc('E')])))
-        print("南:" + strCard(sorted(Player[getPlayerFromLoc('S')])))
-        print("西:" + strCard(sorted(Player[getPlayerFromLoc('W')])))
-        print("池:" + strCard(abandonList))
-
-    hand = [parse_tiles(parse_list(Player[getPlayerFromLoc(Winner)]))]
-    hand.append(parse_tiles(parse_list(Player[getPlayerFromLoc('E')])))
-    hand.append(parse_tiles(parse_list(Player[getPlayerFromLoc('S')])))
-    hand.append(parse_tiles(parse_list(Player[getPlayerFromLoc('W')])))
-    hand.append(parse_tiles(parse_list(Player[getPlayerFromLoc('N')])))
-    dead = parse_tiles(parse_list(abandonList))
-    _validate_counts(hand[1], dead) #Check if tiles are correct
-    _validate_counts(hand[2], dead) #Check if tiles are correct
-    _validate_counts(hand[3], dead) #Check if tiles are correct
-    _validate_counts(hand[4], dead) #Check if tiles are correct
-    run_automation(
-            hand=hand,
-            dead=dead,
-            url=URL_DEFAULT,
-            headless=False,
-            slow_mo=10,
-            timeout_ms=0,
-            screenshot='',
-            pause=True,
-        )
+    
+    automationCtrl(inputIndex)

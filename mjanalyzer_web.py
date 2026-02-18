@@ -208,7 +208,7 @@ def _close_panel(panel) -> None:
 
 
 def run_automation(
-    hand,
+    hand: List[str],
     dead: List[str],
     url: str,
     headless: bool,
@@ -217,66 +217,50 @@ def run_automation(
     screenshot: str | None,
     pause: bool,
 ) -> int:
-    Local = False
     if sync_playwright is None:
         print(
             "Playwright 未安裝。請先執行:\n  pip install playwright\n  playwright install",
             file=sys.stderr,
         )
         return 2
-    
-    i = 0 #預設先分析贏家
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=headless, slow_mo=slow_mo)
         context = browser.new_context()
         page = context.new_page()
         page.set_default_timeout(timeout_ms)
 
-        while not Local:
-            if len(hand) != 5:
-                Local = True
-                hand = [hand]
-            page.goto(url, wait_until="networkidle")
-            page.get_by_text("麻將手牌分析").wait_for(timeout=10000)
+        page.goto(url, wait_until="networkidle")
+        page.get_by_text("麻將手牌分析").wait_for(timeout=10000)
 
-            _open_panel(page)
-            panel = _get_panel(page)
+        _open_panel(page)
+        panel = _get_panel(page)
 
-            # Clear any existing selections.
-            try:
-                panel.get_by_role("button", name=re.compile(r"^清除$")).click(timeout=1500)
-            except Exception:
-                pass
+        # Clear any existing selections.
+        try:
+            panel.get_by_role("button", name=re.compile(r"^清除$")).click(timeout=1500)
+        except Exception:
+            pass
 
-            _select_mode(panel, "hand")
-            for t in hand[i]:
+        _select_mode(panel, "hand")
+        for t in hand:
+            _click_tile(panel, t)
+
+        if dead:
+            _select_mode(panel, "dead")
+            for t in dead:
                 _click_tile(panel, t)
 
-            if dead:
-                _select_mode(panel, "dead")
-                for t in dead:
-                    _click_tile(panel, t)
+        _close_panel(panel)
 
-            _close_panel(panel)
+        page.get_by_role("button", name=re.compile(r"^分析牌型$")).click()
+        page.get_by_text("分析結果").wait_for(timeout=15000)
 
-            page.get_by_role("button", name=re.compile(r"^分析牌型$")).click()
-            page.get_by_text("分析結果").wait_for(timeout=15000)
+        if screenshot:
+            page.screenshot(path=screenshot, full_page=True)
 
-            if screenshot:
-                page.screenshot(path=screenshot, full_page=True)
-
-            if Local and pause and not headless:
-                input("已完成分析，按 Enter 關閉瀏覽器...")
-            if not Local and pause:
-                num = input("Enter 以分析下一組，或直接按數字")
-                if num == '':
-                    i+=1
-                else:
-                    i = int(num)
-                if i == 5: i = 0
-                loc = {0: '贏家', 1:'東', 2:'南', 3:'西', 4:'北'}
-                print(loc[i])
-
+        if pause and not headless:
+            input("已完成分析，按 Enter 關閉瀏覽器...")
 
         browser.close()
     return 0
