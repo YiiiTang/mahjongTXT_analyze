@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Browser automation for https://mjanalyzer.netlify.app/
@@ -123,9 +123,9 @@ LABELS: Dict[str, str] = {
     "2z": "南",
     "3z": "西",
     "4z": "北",
-    "5z": "白",
+    "5z": "中",
     "6z": "發",
-    "7z": "中",
+    "7z": "白",
 }
 
 
