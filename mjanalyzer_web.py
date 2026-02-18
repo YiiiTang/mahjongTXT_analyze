@@ -16,7 +16,7 @@ import argparse
 import re
 import sys
 from collections import Counter
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 try:
     from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -208,6 +208,54 @@ def _close_panel(panel) -> None:
 
 
 
+
+_STATUS_PATTERNS = (
+    re.compile(r"(\u6368\u4e00\u5f35\u5f8c\d+\u9032\u807d)"),
+    re.compile(r"(\u6368\u4e00\u5f35\u5373\u807d\u724c)"),
+    re.compile(r"(\u5df2\u807d\u724c)"),
+    re.compile(r"(\d+\u9032\u807d)"),
+    re.compile(r"(\u80e1\u724c)"),
+)
+
+
+def _status_text_to_shanten(status_text: str) -> Optional[int]:
+    if status_text == "\u80e1\u724c":
+        return -1
+    if status_text in ("\u5df2\u807d\u724c", "\u807d\u724c", "\u6368\u4e00\u5f35\u5373\u807d\u724c"):
+        return 0
+
+    m = re.search(r"\u6368\u4e00\u5f35\u5f8c(\d+)\u9032\u807d", status_text)
+    if m:
+        return int(m.group(1))
+
+    m = re.search(r"(\d+)\u9032\u807d", status_text)
+    if m:
+        return int(m.group(1))
+
+    return None
+
+
+def _extract_site_status(page) -> Tuple[Optional[str], Optional[int]]:
+    try:
+        body_text = page.locator("body").inner_text()
+    except Exception:
+        return None, None
+
+    parts = []
+    result_idx = body_text.find("\u5206\u6790\u7d50\u679c")
+    if result_idx >= 0:
+        parts.append(body_text[result_idx : result_idx + 1800])
+    parts.append(body_text)
+
+    for p in parts:
+        for pat in _STATUS_PATTERNS:
+            m = pat.search(p)
+            if m:
+                status_text = m.group(1)
+                return status_text, _status_text_to_shanten(status_text)
+
+    return None, None
+
 _PERSISTENT_PLAYWRIGHT = None
 _PERSISTENT_BROWSER = None
 _PERSISTENT_CONTEXT = None
@@ -216,7 +264,7 @@ _PERSISTENT_HEADLESS = None
 _PERSISTENT_SLOW_MO = None
 
 
-def _run_on_page(page, hand: List[str], dead: List[str], url: str, screenshot: str | None) -> None:
+def _run_on_page(page, hand: List[str], dead: List[str], url: str, screenshot: str | None) -> Tuple[Optional[str], Optional[int]]:
     page.goto(url, wait_until="networkidle")
     page.get_by_text("麻將手牌分析").wait_for(timeout=10000)
 
@@ -243,8 +291,12 @@ def _run_on_page(page, hand: List[str], dead: List[str], url: str, screenshot: s
     page.get_by_role("button", name=re.compile(r"^分析牌型$")).click()
     page.get_by_text("分析結果").wait_for(timeout=15000)
 
+    status_text, shanten = _extract_site_status(page)
+
     if screenshot:
         page.screenshot(path=screenshot, full_page=True)
+
+    return status_text, shanten
 
 
 def close_automation_session() -> None:
@@ -310,6 +362,7 @@ def run_automation(
     screenshot: str | None,
     pause: bool,
     keep_open_after_run: bool = False,
+    result_holder: Optional[Dict[str, object]] = None,
 ) -> int:
     if sync_playwright is None:
         print(
@@ -321,7 +374,11 @@ def run_automation(
     if keep_open_after_run:
         page = _ensure_persistent_session(headless=headless, slow_mo=slow_mo)
         page.set_default_timeout(timeout_ms)
-        _run_on_page(page=page, hand=hand, dead=dead, url=url, screenshot=screenshot)
+        status_text, shanten = _run_on_page(page=page, hand=hand, dead=dead, url=url, screenshot=screenshot)
+        if result_holder is not None:
+            result_holder.clear()
+            result_holder["status_text"] = status_text
+            result_holder["shanten"] = shanten
         if pause and not headless:
             print("Browser kept open. Continue keyboard control without closing it.")
         return 0
@@ -332,7 +389,11 @@ def run_automation(
         page = context.new_page()
         page.set_default_timeout(timeout_ms)
 
-        _run_on_page(page=page, hand=hand, dead=dead, url=url, screenshot=screenshot)
+        status_text, shanten = _run_on_page(page=page, hand=hand, dead=dead, url=url, screenshot=screenshot)
+        if result_holder is not None:
+            result_holder.clear()
+            result_holder["status_text"] = status_text
+            result_holder["shanten"] = shanten
 
         if pause and not headless:
             print("Browser stays open for manual operation. Close the page/window to continue.")

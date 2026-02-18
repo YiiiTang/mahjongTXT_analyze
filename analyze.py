@@ -172,6 +172,7 @@ def automationCtrl(stepIndex: int):
             marker = '>' if i == currentView else ' '
             print(f"{marker} [{i}] {loc[i]}")
 
+        site_result = {}
         run_automation(
             hand=hand[currentView],
             dead=dead,
@@ -182,7 +183,17 @@ def automationCtrl(stepIndex: int):
             screenshot='',
             pause=False,
             keep_open_after_run=True,
+            result_holder=site_result,
         )
+
+        status_text = site_result.get("status_text")
+        shanten = site_result.get("shanten")
+        if status_text is None:
+            print("網站回傳進聽: (抓取失敗)")
+        elif shanten is None:
+            print(f"網站回傳進聽: {status_text}")
+        else:
+            print(f"網站回傳進聽: {status_text} (上聽數: {shanten})")
 
         action = readNavAction()
         if action == 'quit':
