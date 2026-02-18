@@ -166,7 +166,7 @@ def automationCtrl(stepIndex: int):
             return
 
         loc = {0: f'贏家({winner})', 1: '東', 2: '南', 3: '西', 4: '北'}
-        action = {'M':'摸', 'HD':"打", 'MD': "摸後直接打", 'P': "碰", 'E': "吃", 'H': '為贏家'}
+        action = {'M':'摸', 'HD':"打", 'MD': "摸後直接打", 'P': "碰", 'E': "吃",'EM': "吃", 'H': '為贏家'}
         print("\n" + "=" * 40)
         print(f"Step: {currentStep}/{len(Step)}")
         if currentStep > 0:
