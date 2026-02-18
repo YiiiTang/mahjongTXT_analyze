@@ -207,6 +207,99 @@ def _close_panel(panel) -> None:
         pass
 
 
+
+_PERSISTENT_PLAYWRIGHT = None
+_PERSISTENT_BROWSER = None
+_PERSISTENT_CONTEXT = None
+_PERSISTENT_PAGE = None
+_PERSISTENT_HEADLESS = None
+_PERSISTENT_SLOW_MO = None
+
+
+def _run_on_page(page, hand: List[str], dead: List[str], url: str, screenshot: str | None) -> None:
+    page.goto(url, wait_until="networkidle")
+    page.get_by_text("麻將手牌分析").wait_for(timeout=10000)
+
+    _open_panel(page)
+    panel = _get_panel(page)
+
+    # Clear any existing selections.
+    try:
+        panel.get_by_role("button", name=re.compile(r"^清除$")).click(timeout=1500)
+    except Exception:
+        pass
+
+    _select_mode(panel, "hand")
+    for t in hand:
+        _click_tile(panel, t)
+
+    if dead:
+        _select_mode(panel, "dead")
+        for t in dead:
+            _click_tile(panel, t)
+
+    _close_panel(panel)
+
+    page.get_by_role("button", name=re.compile(r"^分析牌型$")).click()
+    page.get_by_text("分析結果").wait_for(timeout=15000)
+
+    if screenshot:
+        page.screenshot(path=screenshot, full_page=True)
+
+
+def close_automation_session() -> None:
+    global _PERSISTENT_PLAYWRIGHT, _PERSISTENT_BROWSER
+    global _PERSISTENT_CONTEXT, _PERSISTENT_PAGE
+    global _PERSISTENT_HEADLESS, _PERSISTENT_SLOW_MO
+
+    try:
+        if _PERSISTENT_CONTEXT is not None:
+            _PERSISTENT_CONTEXT.close()
+    except Exception:
+        pass
+    try:
+        if _PERSISTENT_BROWSER is not None:
+            _PERSISTENT_BROWSER.close()
+    except Exception:
+        pass
+    try:
+        if _PERSISTENT_PLAYWRIGHT is not None:
+            _PERSISTENT_PLAYWRIGHT.stop()
+    except Exception:
+        pass
+
+    _PERSISTENT_PLAYWRIGHT = None
+    _PERSISTENT_BROWSER = None
+    _PERSISTENT_CONTEXT = None
+    _PERSISTENT_PAGE = None
+    _PERSISTENT_HEADLESS = None
+    _PERSISTENT_SLOW_MO = None
+
+
+def _ensure_persistent_session(headless: bool, slow_mo: int):
+    global _PERSISTENT_PLAYWRIGHT, _PERSISTENT_BROWSER
+    global _PERSISTENT_CONTEXT, _PERSISTENT_PAGE
+    global _PERSISTENT_HEADLESS, _PERSISTENT_SLOW_MO
+
+    recreate = (
+        _PERSISTENT_BROWSER is None
+        or _PERSISTENT_HEADLESS != headless
+        or _PERSISTENT_SLOW_MO != slow_mo
+    )
+    if recreate:
+        close_automation_session()
+        _PERSISTENT_PLAYWRIGHT = sync_playwright().start()
+        _PERSISTENT_BROWSER = _PERSISTENT_PLAYWRIGHT.chromium.launch(
+            headless=headless,
+            slow_mo=slow_mo,
+        )
+        _PERSISTENT_CONTEXT = _PERSISTENT_BROWSER.new_context()
+        _PERSISTENT_PAGE = _PERSISTENT_CONTEXT.new_page()
+        _PERSISTENT_HEADLESS = headless
+        _PERSISTENT_SLOW_MO = slow_mo
+    return _PERSISTENT_PAGE
+
+
 def run_automation(
     hand: List[str],
     dead: List[str],
@@ -216,6 +309,7 @@ def run_automation(
     timeout_ms: int,
     screenshot: str | None,
     pause: bool,
+    keep_open_after_run: bool = False,
 ) -> int:
     if sync_playwright is None:
         print(
@@ -224,45 +318,33 @@ def run_automation(
         )
         return 2
 
+    if keep_open_after_run:
+        page = _ensure_persistent_session(headless=headless, slow_mo=slow_mo)
+        page.set_default_timeout(timeout_ms)
+        _run_on_page(page=page, hand=hand, dead=dead, url=url, screenshot=screenshot)
+        if pause and not headless:
+            print("Browser kept open. Continue keyboard control without closing it.")
+        return 0
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=headless, slow_mo=slow_mo)
         context = browser.new_context()
         page = context.new_page()
         page.set_default_timeout(timeout_ms)
 
-        page.goto(url, wait_until="networkidle")
-        page.get_by_text("麻將手牌分析").wait_for(timeout=10000)
-
-        _open_panel(page)
-        panel = _get_panel(page)
-
-        # Clear any existing selections.
-        try:
-            panel.get_by_role("button", name=re.compile(r"^清除$")).click(timeout=1500)
-        except Exception:
-            pass
-
-        _select_mode(panel, "hand")
-        for t in hand:
-            _click_tile(panel, t)
-
-        if dead:
-            _select_mode(panel, "dead")
-            for t in dead:
-                _click_tile(panel, t)
-
-        _close_panel(panel)
-
-        page.get_by_role("button", name=re.compile(r"^分析牌型$")).click()
-        page.get_by_text("分析結果").wait_for(timeout=15000)
-
-        if screenshot:
-            page.screenshot(path=screenshot, full_page=True)
+        _run_on_page(page=page, hand=hand, dead=dead, url=url, screenshot=screenshot)
 
         if pause and not headless:
-            input("已完成分析，按 Enter 關閉瀏覽器...")
+            print("Browser stays open for manual operation. Close the page/window to continue.")
+            try:
+                page.wait_for_event("close", timeout=0)
+            except Exception:
+                pass
 
-        browser.close()
+        try:
+            browser.close()
+        except Exception:
+            pass
     return 0
 
 
@@ -312,7 +394,7 @@ def main() -> int:
     parser.add_argument(
         "--no-pause",
         action="store_true",
-        help="Do not wait for Enter before closing the browser.",
+        help="Close browser immediately after analysis.",
     )
     args = parser.parse_args()
 
