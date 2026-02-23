@@ -1,80 +1,100 @@
-﻿from mjanalyzer_web import parse_tiles, _validate_counts, run_automation, close_automation_session
+﻿from dataclasses import dataclass, field
+from typing import List
+
 import re
+
+from mjanalyzer_web import parse_tiles, _validate_counts, run_automation, close_automation_session
 
 FILENAME = "SimCat VS MeowCaTS VS Rowlet VS Dartrix (2025_05_03_23_34_33_8270)-(MeowCaTS(Win))_Win.txt"
 URL_DEFAULT = "https://mjanalyzer.netlify.app/"
 
-Player = [[] for _ in range(4)]
-InitialPlayer = [[] for _ in range(4)]
-abandonList = []
+@dataclass
+class PlayerState:
+    tiles: List[str] = field(default_factory=list)
 
-PlayerBank = ''  # 莊家人物
-def getPlayerFromLoc(char):
+@dataclass
+class RoundState:
+    players: List[PlayerState] = field(default_factory=lambda: [PlayerState() for _ in range(4)])
+    initial_players: List[PlayerState] = field(default_factory=lambda: [PlayerState() for _ in range(4)])
+    abandon_tiles: List[str] = field(default_factory=list)
+    steps: List[List[str]] = field(default_factory=list)
+    player_bank: str = ""
+
+    def clear_all(self) -> None:
+        self.steps.clear()
+        self.abandon_tiles.clear()
+        for p in self.players:
+            p.tiles.clear()
+        for p in self.initial_players:
+            p.tiles.clear()
+
+    def reset_round(self) -> None:
+        self.abandon_tiles = []
+        for i in range(4):
+            self.players[i].tiles = self.initial_players[i].tiles.copy()
+
+
+ROUND_STATE = RoundState()
+
+#return player's id
+def getPlayerNameFromLoc(char):
     order = {'E': 0, 'S': 1, 'W': 2, 'N': 3}
-    if PlayerBank == '':
+    if ROUND_STATE.player_bank == '':
         return -1
-    if char == PlayerBank:
+    if char == ROUND_STATE.player_bank:
         return 0
-    return (order[char] - order[PlayerBank]) % 4
+    return (order[char] - order[ROUND_STATE.player_bank]) % 4
+
+#return player' class
+def getPlayerFromLoc(char) -> PlayerState:
+    return ROUND_STATE.players[getPlayerNameFromLoc(char)]
 
 
 def processAction(StepData):
     actionStr = StepData[2]
     try:
         if actionStr == 'M':  # 摸牌，進手排
-            Player[getPlayerFromLoc(StepData[1])].append(StepData[3])
+            getPlayerFromLoc(StepData[1]).tiles.append(StepData[3])
         if actionStr == 'HD':  # 打牌，捨手排 去牌池
-            Player[getPlayerFromLoc(StepData[1])].remove(StepData[3])
-            abandonList.append(StepData[3])
+            getPlayerFromLoc(StepData[1]).tiles.remove(StepData[3])
+            ROUND_STATE.abandon_tiles.append(StepData[3])
         if actionStr == 'MD':  # 摸切 不加入手排 去牌池
-            Player[getPlayerFromLoc(StepData[1])].remove(StepData[3])
-            abandonList.append(StepData[3])
+            getPlayerFromLoc(StepData[1]).tiles.remove(StepData[3])
+            ROUND_STATE.abandon_tiles.append(StepData[3])
         if actionStr == 'P':  # 碰
-            abandonList.remove(StepData[3])
-            Player[getPlayerFromLoc(StepData[1])].append(StepData[3])
+            ROUND_STATE.abandon_tiles.remove(StepData[3])
+            getPlayerFromLoc(StepData[1]).tiles.append(StepData[3])
         if actionStr == 'E' or actionStr == 'EM':  # 吃
-            abandonList.remove(StepData[4])
-            Player[getPlayerFromLoc(StepData[1])].append(StepData[4])
+            ROUND_STATE.abandon_tiles.remove(StepData[4])
+            getPlayerFromLoc(StepData[1]).tiles.append(StepData[4])
         if actionStr == 'H':  # Winner
             return StepData[1]
     except Exception:
         pass
 
-
-Step = []
-
-
+#read txt into list
 def processFile():
-    Step.clear()
-    for i in range(4):
-        Player[i].clear()
-        InitialPlayer[i].clear()
+    ROUND_STATE.clear_all()
 
     with open(FILENAME, "r", encoding='utf-16-le') as f:
         for line in f:
             if re.match(r'\*\s*\d+\.', line):
-                Step.append(line.replace(".", "").replace("* ", "").strip().split(' '))
+                ROUND_STATE.steps.append(line.replace(".", "").replace("* ", "").strip().split(' '))
             if "SQRWALL" in line:
                 river = line.replace("* SQRWALL ", "").split(' ')
                 for i in range(0, 65):
                     if i < 17:
-                        Player[0].append(river[i])
-                        InitialPlayer[0].append(river[i])
-                        continue
-                    if i < 33:
-                        Player[1].append(river[i])
-                        InitialPlayer[1].append(river[i])
-                        continue
-                    if i < 49:
-                        Player[2].append(river[i])
-                        InitialPlayer[2].append(river[i])
-                        continue
-                    if i < 65:
-                        Player[3].append(river[i])
-                        InitialPlayer[3].append(river[i])
-                        continue
+                        target = 0
+                    elif i < 33:
+                        target = 1
+                    elif i < 49:
+                        target = 2
+                    else:
+                        target = 3
+                    ROUND_STATE.players[target].tiles.append(river[i])
+                    ROUND_STATE.initial_players[target].tiles.append(river[i])
 
-
+#convert list(三數字) into list(數字_文字)
 def parse_list(cards):
     typeDict = {0: '', 1: 'm', 2: 'p', 3: 's', 4: 'z'}
     out = ""
@@ -83,34 +103,32 @@ def parse_list(cards):
         out += str(str(int(card / 10 % 10)) + typeDict[int(card / 100)])
     return out
 
-
+#return winner in char
 def getWinnerLoc():
-    for s in reversed(Step):
+    for s in reversed(ROUND_STATE.steps):
         if len(s) > 2 and s[2] == 'H':
             return s[1]
-    if Step:
-        return Step[0][1]
+    if ROUND_STATE.steps:
+        return ROUND_STATE.steps[0][1]
     return 'E'
 
 
 def resetRoundState():
-    global Player, abandonList
-    Player = [p.copy() for p in InitialPlayer]
-    abandonList = []
+    ROUND_STATE.reset_round()
 
 
 def buildViewData(stepIndex):
     resetRoundState()
     for i in range(stepIndex):
-        processAction(Step[i])
+        processAction(ROUND_STATE.steps[i])
 
     winner = getWinnerLoc()
-    hand = [parse_tiles(parse_list(Player[getPlayerFromLoc(winner)]))]
-    hand.append(parse_tiles(parse_list(Player[getPlayerFromLoc('E')])))
-    hand.append(parse_tiles(parse_list(Player[getPlayerFromLoc('S')])))
-    hand.append(parse_tiles(parse_list(Player[getPlayerFromLoc('W')])))
-    hand.append(parse_tiles(parse_list(Player[getPlayerFromLoc('N')])))
-    dead = parse_tiles(parse_list(abandonList))
+    hand = [parse_tiles(parse_list(getPlayerFromLoc(winner).tiles))]
+    hand.append(parse_tiles(parse_list(getPlayerFromLoc('E').tiles)))
+    hand.append(parse_tiles(parse_list(getPlayerFromLoc('S').tiles)))
+    hand.append(parse_tiles(parse_list(getPlayerFromLoc('W').tiles)))
+    hand.append(parse_tiles(parse_list(getPlayerFromLoc('N').tiles)))
+    dead = parse_tiles(parse_list(ROUND_STATE.abandon_tiles))
     for i in range(1, 5):
         _validate_counts(hand[i], dead)
     return hand, dead, winner
@@ -150,13 +168,26 @@ def readNavAction():
         return 'jump_step'
     return 'next_view'
 
+
 def strCard(card: int):
-    typeDict = {0:'花', 1:'萬', 2:'筒', 3:'條', 4:'字'}
-    out =  str(str(int(card/10%10)) + typeDict[int(card/100)])
+    typeDict = {0: '花', 1: '萬', 2: '筒', 3: '條', 4: '字'}
+    out = str(str(int(card / 10 % 10)) + typeDict[int(card / 100)])
     return out
 
+
+def format_step_action(step_data, loc_map, action_map):
+    text = ' '.join(step_data[1:])
+    try:
+        actor = loc_map[getPlayerNameFromLoc(step_data[1])]
+        action_text = action_map.get(step_data[2], step_data[2])
+        tile_text = strCard(int(step_data[3])) if len(step_data) > 3 else ''
+        return f"{text} ({actor} {action_text} {tile_text})"
+    except Exception:
+        return text
+
+
 def automationCtrl(stepIndex: int):
-    currentStep = max(0, min(stepIndex, len(Step)))
+    currentStep = max(0, min(stepIndex, len(ROUND_STATE.steps)))
     currentView = 0
     while True:
         try:
@@ -166,11 +197,12 @@ def automationCtrl(stepIndex: int):
             return
 
         loc = {0: f'贏家({winner})', 1: '東', 2: '南', 3: '西', 4: '北'}
-        action = {'M':'摸', 'HD':"打", 'MD': "摸後直接打", 'P': "碰", 'E': "吃",'EM': "吃", 'H': '為贏家'}
+        action = {'M': '摸', 'HD': "打", 'MD': "摸後直接打", 'P': "碰", 'E': "吃", 'EM': "吃", 'H': '為贏家'}
         print("\n" + "=" * 40)
-        print(f"Step: {currentStep}/{len(Step)}")
+        print(f"Step: {currentStep}/{len(ROUND_STATE.steps)}")
         if currentStep > 0:
-            print(f"Action: {' '.join(Step[currentStep - 1][1:])} ({loc[getPlayerFromLoc(Step[currentStep - 1][1])]} {action[Step[currentStep - 1][2]]} {strCard(int(Step[currentStep - 1][3]))})")
+            step_data = ROUND_STATE.steps[currentStep - 1]
+            print(f"Action: {format_step_action(step_data, loc, action)}")
         print("Controls: ←/→ step, ↑/↓ view, Enter next view, G jump, Q quit")
         for i in range(5):
             marker = '>' if i == currentView else ' '
@@ -192,12 +224,33 @@ def automationCtrl(stepIndex: int):
 
         status_text = site_result.get("status_text")
         shanten = site_result.get("shanten")
+        effective_tiles = site_result.get("effective_tiles") or []
         if status_text is None:
             print("網站回傳進聽: (抓取失敗)")
         elif shanten is None:
             print(f"網站回傳進聽: {status_text}")
         else:
             print(f"網站回傳進聽: {status_text} (上聽數: {shanten})")
+
+        if effective_tiles:
+            preview = []
+            for t in effective_tiles[:8]:
+                label = t.get("label") or t.get("symbol") or "?"
+                remain = t.get("remaining")
+                prob = t.get("probability")
+                if remain is None:
+                    if prob is None:
+                        preview.append(f"{label}")
+                    else:
+                        preview.append(f"{label}({prob}%)")
+                else:
+                    if prob is None:
+                        preview.append(f"{label}({remain}枚)")
+                    else:
+                        preview.append(f"{label}({remain}枚/{prob}%)")
+            if len(effective_tiles) > 8:
+                preview.append("...")
+            print("網站建議進張: " + ", ".join(preview))
 
         action = readNavAction()
         if action == 'quit':
@@ -206,27 +259,31 @@ def automationCtrl(stepIndex: int):
         if action == 'prev_step':
             currentStep = max(0, currentStep - 1)
         elif action == 'next_step':
-            currentStep = min(len(Step), currentStep + 1)
+            currentStep = min(len(ROUND_STATE.steps), currentStep + 1)
         elif action == 'prev_view':
             currentView = (currentView - 1) % 5
         elif action == 'next_view':
             currentView = (currentView + 1) % 5
         elif action == 'jump_step':
-            raw = input(f"Step index (0-{len(Step)}): ").strip()
+            raw = input(f"Step index (0-{len(ROUND_STATE.steps)}): ").strip()
             if raw.isdigit():
-                currentStep = min(len(Step), max(0, int(raw)))
+                currentStep = min(len(ROUND_STATE.steps), max(0, int(raw)))
 
 
 if __name__ == "__main__":
     processFile()
-    PlayerBank = Step[0][1]
+    if not ROUND_STATE.steps:
+        print("找不到牌譜步驟資料")
+        raise SystemExit(1)
+
+    ROUND_STATE.player_bank = ROUND_STATE.steps[0][1]
     inputIndex = input('輸入模擬的步驟:(Enter=last)')
     if inputIndex == '':
-        inputIndex = len(Step)
+        inputIndex = len(ROUND_STATE.steps)
     else:
         inputIndex = int(inputIndex)
 
-    if inputIndex > len(Step):
+    if inputIndex > len(ROUND_STATE.steps):
         print("超出模擬步驟範圍")
         raise SystemExit(1)
 

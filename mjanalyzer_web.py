@@ -256,6 +256,49 @@ def _extract_site_status(page) -> Tuple[Optional[str], Optional[int]]:
 
     return None, None
 
+
+def _extract_effective_tiles(page) -> List[Dict[str, object]]:
+    """Extract draw recommendations from the '建議進張 (若摸到)' section."""
+    try:
+        tiles = page.evaluate(
+            """
+            () => {
+              const heading = Array.from(document.querySelectorAll('h3'))
+                .find(el => (el.textContent || '').includes('建議進張 (若摸到)'));
+              if (!heading) return [];
+
+              const section = heading.nextElementSibling;
+              if (!section) return [];
+              const cards = Array.from(section.children || []);
+              if (!cards.length) return [];
+
+              const out = [];
+              for (const item of cards) {
+                const btn = item.querySelector('button[title]');
+                if (!btn) continue;
+                const label = btn.getAttribute('title') || '';
+                const symbol = (btn.querySelector('span')?.textContent || btn.textContent || '').trim();
+                const txt = item.textContent || '';
+                const m = txt.match(/(\\d+)\\s*枚/);
+                const p = txt.match(/(\\d+(?:\\.\\d+)?)\\s*%/);
+                out.push({
+                  label,
+                  symbol,
+                  remaining: m ? parseInt(m[1], 10) : null,
+                  probability: p ? parseFloat(p[1]) : null,
+                });
+              }
+              return out;
+            }
+            """
+        )
+    except Exception:
+        return []
+
+    if isinstance(tiles, list):
+        return tiles
+    return []
+
 _PERSISTENT_PLAYWRIGHT = None
 _PERSISTENT_BROWSER = None
 _PERSISTENT_CONTEXT = None
@@ -264,7 +307,13 @@ _PERSISTENT_HEADLESS = None
 _PERSISTENT_SLOW_MO = None
 
 
-def _run_on_page(page, hand: List[str], dead: List[str], url: str, screenshot: str | None) -> Tuple[Optional[str], Optional[int]]:
+def _run_on_page(
+    page,
+    hand: List[str],
+    dead: List[str],
+    url: str,
+    screenshot: str | None,
+) -> Tuple[Optional[str], Optional[int], List[Dict[str, object]]]:
     page.goto(url, wait_until="networkidle")
     page.get_by_text("麻將手牌分析").wait_for(timeout=10000)
 
@@ -292,11 +341,12 @@ def _run_on_page(page, hand: List[str], dead: List[str], url: str, screenshot: s
     page.get_by_text("分析結果").wait_for(timeout=15000)
 
     status_text, shanten = _extract_site_status(page)
+    effective_tiles = _extract_effective_tiles(page)
 
     if screenshot:
         page.screenshot(path=screenshot, full_page=True)
 
-    return status_text, shanten
+    return status_text, shanten, effective_tiles
 
 
 def close_automation_session() -> None:
@@ -374,11 +424,18 @@ def run_automation(
     if keep_open_after_run:
         page = _ensure_persistent_session(headless=headless, slow_mo=slow_mo)
         page.set_default_timeout(timeout_ms)
-        status_text, shanten = _run_on_page(page=page, hand=hand, dead=dead, url=url, screenshot=screenshot)
+        status_text, shanten, effective_tiles = _run_on_page(
+            page=page,
+            hand=hand,
+            dead=dead,
+            url=url,
+            screenshot=screenshot,
+        )
         if result_holder is not None:
             result_holder.clear()
             result_holder["status_text"] = status_text
             result_holder["shanten"] = shanten
+            result_holder["effective_tiles"] = effective_tiles
         if pause and not headless:
             print("Browser kept open. Continue keyboard control without closing it.")
         return 0
@@ -389,11 +446,18 @@ def run_automation(
         page = context.new_page()
         page.set_default_timeout(timeout_ms)
 
-        status_text, shanten = _run_on_page(page=page, hand=hand, dead=dead, url=url, screenshot=screenshot)
+        status_text, shanten, effective_tiles = _run_on_page(
+            page=page,
+            hand=hand,
+            dead=dead,
+            url=url,
+            screenshot=screenshot,
+        )
         if result_holder is not None:
             result_holder.clear()
             result_holder["status_text"] = status_text
             result_holder["shanten"] = shanten
+            result_holder["effective_tiles"] = effective_tiles
 
         if pause and not headless:
             print("Browser stays open for manual operation. Close the page/window to continue.")
