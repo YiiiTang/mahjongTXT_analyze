@@ -1,3 +1,6 @@
+#to be fixed
+
+from typing import List, Optional, Tuple
 from mjanalyzer_web import parse_tiles, _validate_counts, run_automation, close_automation_session
 
 URL_DEFAULT = "https://mjanalyzer.netlify.app/"

@@ -86,6 +86,7 @@ def processFile(filename: str) -> None:
         if winner:
             STATES.winnerLoc = winner
         STATES.appendRoundWithData(next_state)
+    annotate_states_shanten(STATES)
 
 
 def parse_list(cards: List[str]) -> str:
@@ -118,29 +119,5 @@ def getRound(filename: str)-> States:
     processFile(filename)
     if not STATES.state:
         raise ValueError("filename?") 
-    
     return STATES
 
-
-
-if __name__ == "__main__":
-    processFile("SimCat VS MeowCaTS VS Rowlet VS Dartrix (2025_05_03_23_34_33_8270)-(MeowCaTS(Win))_Win.txt")
-    annotate_states_shanten(STATES)
-
-    for i in range(80):
-        print(STATES.state[i].player[0].shantenCount)
-
-
-
-    #步驟模擬用
-    # inputIndex = input('輸入模擬的步驟:(Enter=last)')
-    # if inputIndex == '':
-    #     inputIndex = STATES.steps_count()
-    # else:
-    #     inputIndex = int(inputIndex)
-
-    # if inputIndex > STATES.steps_count():
-    #     print("超出模擬步驟範圍")
-    #     raise SystemExit(1)
-    # automationCtrl(inputIndex)
-    #步驟模擬用
