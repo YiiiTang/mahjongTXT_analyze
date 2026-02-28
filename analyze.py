@@ -13,6 +13,7 @@ def _parse_step_line(line: str) -> List[str]:
     return line.replace(".", "").replace("* ", "").strip().split(' ')
 
 def processAction(ref: RoundState, step_data: List[str]) -> Optional[str]:
+    ref.stepData = step_data
     action_str = step_data[2]
     try:
         actor = STATES.get_player(ref, step_data[1])#主角

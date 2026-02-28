@@ -14,6 +14,7 @@ class playerState:
 @dataclass
 class RoundState:
     stepStr: str = ""
+    stepData: List[str] = field(default_factory=list)#1 主角 2 動作 3..10 排
     stepId: int = 0
     player: List[playerState] = field(default_factory=lambda: [playerState() for _ in range(4)])
     abandonTiles: List[str] = field(default_factory=list)
