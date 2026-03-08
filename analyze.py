@@ -33,7 +33,7 @@ def processAction(ref: RoundState, step_data: List[str]) -> Optional[str]:
             ref.abandonTiles.remove(step_data[3])
             actor.tiles.append(step_data[3])
 
-        if action_str in ('E', 'EM'):  # 吃
+        if action_str in ('E', 'EM', 'EL', 'ER'): # 吃
             ref.abandonTiles.remove(step_data[4])
             actor.tiles.append(step_data[4])
 
