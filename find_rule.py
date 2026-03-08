@@ -11,18 +11,22 @@ def list_files(directory_path):
     files = [entry for entry in p.iterdir() if entry.is_file()]
     return files
 
-def first_step_ting(stats: States, int_player: int) -> int:
-      out = -2
-      tmp = 999
-      for i in stats.state:
-            shanting = i.player[int_player].shantenCount
-            if(shanting < tmp):
-                  tmp = shanting
-                  out = i.stepId
-            pass
-      if tmp == 0 or tmp == -1:
-        return out
-      else: return -2
+def is_tenpai(ref, states, loc):
+    p = states.get_player(ref, loc)
+    sh = p.shantenCount
+    if sh == -1:
+        return True
+    return sh == 0 and (len(p.tiles) % 3 == 1)
+
+def first_tenpai_step(states, loc_char):
+    idx = states.player_index_from_loc(loc_char)
+    for ref in states.state:  # stepId 遞增
+        p = ref.player[idx]
+        # 已聽牌：0向聽且是打完牌相位(16張，len%3==1)
+        if p.shantenCount == 0 and (len(p.tiles) % 3 == 1):
+            return ref.stepId
+    return -2  # 沒有到聽牌
+
 
 def not_winner(winner:str) -> List[str]:
       return [loc for loc in ['W', 'S', 'N', 'E'] if loc != winner]
@@ -49,14 +53,13 @@ if __name__ == "__main__":
             print(file)
             states = getRound(file)
             
-            ting = True
             #從上廳數=0到結束
             step = []
             step_table = {"M":0,"HD":0, "MD":0, "P":0,"E":0,"EM": 0, "EL":0,"ER": 0, "SM":0, "UG":0, "HG":0,"G":0,"H":0}
-            first_ting_step = first_step_ting(states, states.player_index_from_loc(states.winnerLoc))
-            if first_ting_step == -2:
-                  ting = False
-                  ting = states.get_player(states.state[states.steps_count()],states.winnerLoc).shantenCount
+            ting_pai_step = first_tenpai_step(states, states.winnerLoc)
+            if ting_pai_step == -2:
+                 ting_pai_step = False
+            
             #tiles_in_wall = states.state[first_step_ting].
             
             for j in range(1, len(states.state)):
@@ -67,21 +70,25 @@ if __name__ == "__main__":
                         #統計步驟數量
                         step_table[states.state[j].stepData[2]] +=1
             mo = 0
-            for i in range(1, first_ting_step):
+            for i in range(1, ting_pai_step):
                   if(states.state[i].stepData[1] == states.winnerLoc and states.state[i].stepData[2] == 'M'):
                         mo+=1
                   pass
+            count_ting_mountain = states.state[ting_pai_step].mountainCount
+            count_win_mountain = states.state[states.steps_count()].mountainCount
                   
             #print(f"{player} 連續摸切: {MD_count}" )
             pd_data = pd.DataFrame([{
                   'filename': str(file),
                   'winner': states.winnerLoc,
                   'player': states.winnerLoc,
-                  '最後上聽數': ting,
                   'count摸牌': step_table["M"],
                   'count打牌': step_table["HD"],
                   'count摸切': step_table["MD"],
                   'count聽前摸牌次數': mo,
+                  '聽牌時排山剩餘張': count_ting_mountain,
+                  '胡牌時排山剩餘張': count_win_mountain,
+                  '胡牌-聽牌剩餘張' : count_ting_mountain - count_win_mountain,
                   'count碰+吃': step_table["P"] + step_table["E"] + step_table["EM"] + step_table["EL"] + step_table["ER"]
             }])
             print(pd_data)
